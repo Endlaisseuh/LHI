@@ -1,206 +1,313 @@
 /******************************************************************************
  * LHI Analyzer
- * GraphView
+ * PlotManager
  *
- * Un graphique complet : en-tête, barre d'outils, plot Plotly et panneau
- * de mesures.
+ * Gestion de Plotly, des modes d'interaction et de l'affichage des curseurs.
  ******************************************************************************/
 
-LHI.GraphView = class {
+LHI.PlotManager = class {
 
-    constructor(title) {
+    constructor(element, cursorManager) {
+        this.element = element;
+        this.cursorManager = cursorManager;
 
-        this.title = title;
+        this.xData = [];
+        this.yData = [];
 
-        this.toolManager = new LHI.ToolManager();
-        this.cursorManager = new LHI.CursorManager();
+        this.currentTool = LHI.ToolManager.TOOLS.PAN;
 
-        this.measurePanel = new LHI.MeasurePanel(this.cursorManager);
+        this.onDoubleClickCallback = null;
+        this.lastPlotClick = null;
+        this.doubleClickDelay = 500;
 
-        this.graphToolbar = new LHI.GraphToolbar(this.toolManager);
+        this.initialized = false;
+        this.ready = null;
 
-        this.plotManager = null;
+        this.layout = {
+            paper_bgcolor: "#303030",
+            plot_bgcolor: "#202020",
 
-        this.plotElement = null;
-        this.footerElement = null;
-        this.element = null;
+            font: {
+                color: "#f5f5f5",
+                size: 12
+            },
 
+            margin: {
+                t: 20,
+                r: 20,
+                b: 40,
+                l: 55
+            },
+
+            xaxis: {
+                gridcolor: "#444",
+                zerolinecolor: "#555"
+            },
+
+            yaxis: {
+                gridcolor: "#444",
+                zerolinecolor: "#555"
+            },
+
+            dragmode: "pan",
+            shapes: []
+        };
+
+        this.config = {
+            responsive: true,
+            displaylogo: false,
+            doubleClick: false,
+            scrollZoom: false,
+
+            modeBarButtonsToRemove: [
+                "zoom2d",
+                "pan2d",
+                "select2d",
+                "lasso2d",
+                "zoomIn2d",
+                "zoomOut2d",
+                "autoScale2d",
+                "resetScale2d"
+            ]
+        };
+
+        this.cursorManager.onChange(() => {
+            this.updateCursorDisplay();
+        });
     }
 
-    render() {
-
-        this.element = document.createElement("section");
-        this.element.className = "graph-view";
-
-        const header = document.createElement("div");
-        header.className = "graph-header";
-        header.textContent = this.title;
-
-        this.plotElement = document.createElement("div");
-        this.plotElement.className = "graph-plot";
-
-        this.footerElement = document.createElement("div");
-        this.footerElement.className = "graph-footer";
-        this.footerElement.textContent = "Aucune donnée";
-
-        const content = document.createElement("div");
-        content.className = "graph-content";
-
-        content.append(
-
-            this.plotElement,
-
-            this.footerElement,
-
-            this.measurePanel.render()
-
-        );
-
-        this.element.append(
-
-            header,
-
-            this.graphToolbar.render(),
-
-            content
-
-        );
-
-        this.plotManager = new LHI.PlotManager(
-
-            this.plotElement,
-
-            this.cursorManager
-
-        );
-
-        this.plotManager.onPointClick(
-
-            index => this.handlePlotClick(index)
-
-        );
-
-        this.plotManager.init();
-
-        this.bindEvents();
-
-        this.toolManager.onChange(
-
-            tool => this.onToolChanged(tool)
-
-        );
-
-        return this.element;
-
-    }
-
-    onToolChanged(tool) {
-
-        switch (tool) {
-
-            case LHI.ToolManager.TOOLS.CURSOR:
-                break;
-
-            case LHI.ToolManager.TOOLS.PAN:
-                break;
-
-            case LHI.ToolManager.TOOLS.ZOOM:
-                break;
-
-        }
-
-    }
-
-    setData(x, y) {
-
-        this.plotManager.setData(x, y);
-
-        this.footerElement.textContent = x.length
-
-            ? `${x.length} points • X: ${x[0].toFixed(2)} → ${x[x.length - 1].toFixed(2)}`
-
-            : "Aucune donnée";
-
-    }
-
-    handlePlotClick(index) {
-
-        if (!this.toolManager.is(LHI.ToolManager.TOOLS.CURSOR)) {
-
-            return;
-
-        }
-
-        const a = this.cursorManager.getCursorA();
-
-        const b = this.cursorManager.getCursorB();
-
-        if (!a) {
-
-            this.cursorManager.create("A", index);
-
-        }
-
-        else if (!b) {
-
-            this.cursorManager.create("B", index);
-
-        }
-
-        else {
-
-            const nearest =
-
-                Math.abs(a.index - index)
-
-                <=
-
-                Math.abs(b.index - index)
-
-                ? "A"
-
-                : "B";
-
-            this.cursorManager.create(nearest, index);
-
-        }
-
+    init() {
+        this.ready = Plotly.newPlot(
+            this.element,
+            [
+                this.buildTrace([], [])
+            ],
+            this.layout,
+            this.config
+        ).then(() => {
+            this.initialized = true;
+
+            this.bindEvents();
+
+            return this.renderData();
+        });
+
+        return this.ready;
     }
 
     bindEvents() {
+        this.element.on(
+            "plotly_click",
+            event => this.handlePlotClick(event)
+        );
 
-        this.measurePanel.element
+        this.element.on(
+            "plotly_doubleclick",
+            () => false
+        );
+    }
 
-            .querySelectorAll("button[data-action]")
+    handlePlotClick(event) {
+        if (
+            this.currentTool
+            !== LHI.ToolManager.TOOLS.CURSOR
+        ) {
+            this.lastPlotClick = null;
+            return;
+        }
 
-            .forEach(button => {
+        if (
+            !event.points
+            || !event.points.length
+            || !this.onDoubleClickCallback
+        ) {
+            return;
+        }
 
-                button.addEventListener("click", () => {
+        const pointIndex = event.points[0].pointIndex;
+        const now = Date.now();
 
-                    const action = button.dataset.action;
+        if (
+            this.lastPlotClick
+            && now - this.lastPlotClick.time
+                <= this.doubleClickDelay
+        ) {
+            this.lastPlotClick = null;
 
-                    const cursorId = action.charAt(0);
+            this.onDoubleClickCallback(
+                pointIndex
+            );
 
-                    const direction =
+            return;
+        }
 
-                        action.includes("left")
+        this.lastPlotClick = {
+            time: now,
+            pointIndex
+        };
+    }
 
-                            ? "left"
+    onPointDoubleClick(callback) {
+        this.onDoubleClickCallback =
+            typeof callback === "function"
+                ? callback
+                : null;
+    }
 
-                            : "right";
+    setInteractionMode(tool) {
+        if (
+            !Object
+                .values(LHI.ToolManager.TOOLS)
+                .includes(tool)
+        ) {
+            return;
+        }
 
-                    this.cursorManager.move(
+        this.currentTool = tool;
+        this.lastPlotClick = null;
 
-                        cursorId,
+        if (this.initialized) {
+            this.applyInteractionMode();
+        }
+    }
 
-                        direction
+    applyInteractionMode() {
+        Plotly.relayout(
+            this.element,
+            {
+                dragmode: this.getDragMode()
+            }
+        );
+    }
 
-                    );
+    getDragMode() {
+        switch (this.currentTool) {
+            case LHI.ToolManager.TOOLS.CURSOR:
+                return false;
 
-                });
+            case LHI.ToolManager.TOOLS.ZOOM:
+                return "zoom";
 
+            case LHI.ToolManager.TOOLS.PAN:
+            default:
+                return "pan";
+        }
+    }
+
+    setData(x, y) {
+        const xData = Array.isArray(x) ? x : [];
+        const yData = Array.isArray(y) ? y : [];
+        const length = Math.min(
+            xData.length,
+            yData.length
+        );
+
+        this.xData = xData.slice(
+            0,
+            length
+        );
+
+        this.yData = yData.slice(
+            0,
+            length
+        );
+
+        this.cursorManager.setData(
+            this.xData,
+            this.yData
+        );
+
+        if (this.initialized) {
+            this.renderData();
+        }
+
+        return {
+            x: this.xData,
+            y: this.yData
+        };
+    }
+
+    renderData() {
+        if (!this.initialized) {
+            return Promise.resolve();
+        }
+
+        this.layout.shapes = [];
+
+        return Plotly.react(
+            this.element,
+            [
+                this.buildTrace(
+                    this.xData,
+                    this.yData
+                )
+            ],
+            this.layout,
+            this.config
+        ).then(() => {
+            this.applyInteractionMode();
+            this.updateCursorDisplay();
+        });
+    }
+
+    buildTrace(x, y) {
+        return {
+            x,
+            y,
+            type: "scatter",
+            mode: "lines",
+
+            line: {
+                color: "#4FC3F7",
+                width: 1.5
+            }
+        };
+    }
+
+    createCursorLine(cursor) {
+        return {
+            type: "line",
+
+            x0: cursor.x,
+            x1: cursor.x,
+
+            y0: 0,
+            y1: 1,
+
+            xref: "x",
+            yref: "paper",
+
+            line: {
+                width: 2,
+                dash: "dot",
+
+                color:
+                    cursor.id === "A"
+                        ? "#FFD54F"
+                        : "#00D7FF"
+            }
+        };
+    }
+
+    updateCursorDisplay() {
+        if (!this.initialized) {
+            return;
+        }
+
+        const shapes = this.cursorManager
+            .getAll()
+            .map(cursor => {
+                return this.createCursorLine(
+                    cursor
+                );
             });
 
+        Plotly.relayout(
+            this.element,
+            {
+                shapes
+            }
+        );
     }
 
 };
