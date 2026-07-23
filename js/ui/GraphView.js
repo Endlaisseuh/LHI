@@ -1,91 +1,205 @@
 /******************************************************************************
  * LHI Analyzer
- * GraphToolbar
+ * GraphView
+ *
+ * Un graphique complet : en-tête, barre d'outils, plot Plotly et panneau
+ * de mesures.
  ******************************************************************************/
 
-LHI.GraphToolbar = class {
+LHI.GraphView = class {
 
-    constructor(toolManager) {
+    constructor(title) {
 
-        this.toolManager = toolManager;
+        this.title = title;
 
+        this.toolManager = new LHI.ToolManager();
+        this.cursorManager = new LHI.CursorManager();
+
+        this.measurePanel = new LHI.MeasurePanel(this.cursorManager);
+
+        this.graphToolbar = new LHI.GraphToolbar(this.toolManager);
+
+        this.plotManager = null;
+
+        this.plotElement = null;
+        this.footerElement = null;
         this.element = null;
 
     }
 
     render() {
 
-        this.element = document.createElement("div");
-        this.element.className = "graph-toolbar";
+        this.element = document.createElement("section");
+        this.element.className = "graph-view";
 
-        this.element.appendChild(
-            this.createButton(
-                "Curseur",
-                LHI.ToolManager.TOOLS.CURSOR
-            )
+        const header = document.createElement("div");
+        header.className = "graph-header";
+        header.textContent = this.title;
+
+        this.plotElement = document.createElement("div");
+        this.plotElement.className = "graph-plot";
+
+        this.footerElement = document.createElement("div");
+        this.footerElement.className = "graph-footer";
+        this.footerElement.textContent = "Aucune donnée";
+
+        const content = document.createElement("div");
+        content.className = "graph-content";
+
+        content.append(
+
+            this.plotElement,
+
+            this.footerElement,
+
+            this.measurePanel.render()
+
         );
 
-        this.element.appendChild(
-            this.createButton(
-                "Déplacer",
-                LHI.ToolManager.TOOLS.PAN
-            )
+        this.element.append(
+
+            header,
+
+            this.graphToolbar.render(),
+
+            content
+
         );
 
-        this.element.appendChild(
-            this.createButton(
-                "Zoom",
-                LHI.ToolManager.TOOLS.ZOOM
-            )
+        this.plotManager = new LHI.PlotManager(
+
+            this.plotElement,
+
+            this.cursorManager
+
         );
 
-        this.toolManager.onChange(() => this.refresh());
+        this.plotManager.onPointClick(
 
-        this.refresh();
+            index => this.handlePlotClick(index)
+
+        );
+
+        this.plotManager.init();
+
+        this.bindEvents();
+
+        this.toolManager.onChange(
+
+            tool => this.onToolChanged(tool)
+
+        );
 
         return this.element;
 
     }
 
-    createButton(label, tool) {
+    onToolChanged(tool) {
 
-        const button = document.createElement("button");
+        switch (tool) {
 
-        button.className = "graph-tool-button";
+            case LHI.ToolManager.TOOLS.CURSOR:
+                break;
 
-        button.dataset.tool = tool;
+            case LHI.ToolManager.TOOLS.PAN:
+                break;
 
-        button.textContent = label;
+            case LHI.ToolManager.TOOLS.ZOOM:
+                break;
 
-        button.addEventListener("click", () => {
-
-            this.toolManager.setTool(tool);
-
-        });
-
-        return button;
+        }
 
     }
 
-    refresh() {
+    setData(x, y) {
 
-        if (!this.element) {
+        this.plotManager.setData(x, y);
+
+        this.footerElement.textContent = x.length
+
+            ? `${x.length} points • X: ${x[0].toFixed(2)} → ${x[x.length - 1].toFixed(2)}`
+
+            : "Aucune donnée";
+
+    }
+
+    handlePlotClick(index) {
+
+        if (!this.toolManager.is(LHI.ToolManager.TOOLS.CURSOR)) {
 
             return;
 
         }
 
-        this.element.querySelectorAll(".graph-tool-button").forEach(button => {
+        const a = this.cursorManager.getCursorA();
 
-            button.classList.toggle(
+        const b = this.cursorManager.getCursorB();
 
-                "active",
+        if (!a) {
 
-                button.dataset.tool === this.toolManager.getTool()
+            this.cursorManager.create("A", index);
 
-            );
+        }
 
-        });
+        else if (!b) {
+
+            this.cursorManager.create("B", index);
+
+        }
+
+        else {
+
+            const nearest =
+
+                Math.abs(a.index - index)
+
+                <=
+
+                Math.abs(b.index - index)
+
+                ? "A"
+
+                : "B";
+
+            this.cursorManager.create(nearest, index);
+
+        }
+
+    }
+
+    bindEvents() {
+
+        this.measurePanel.element
+
+            .querySelectorAll("button[data-action]")
+
+            .forEach(button => {
+
+                button.addEventListener("click", () => {
+
+                    const action = button.dataset.action;
+
+                    const cursorId = action.charAt(0);
+
+                    const direction =
+
+                        action.includes("left")
+
+                            ? "left"
+
+                            : "right";
+
+                    this.cursorManager.move(
+
+                        cursorId,
+
+                        direction
+
+                    );
+
+                });
+
+            });
 
     }
 
