@@ -14,7 +14,8 @@ LHI.PlotManager = class {
         this.xData = [];
         this.yData = [];
 
-        this.currentTool = LHI.ToolManager.TOOLS.PAN;
+        this.currentTool =
+            LHI.ToolManager.TOOLS.PAN;
 
         this.onDoubleClickCallback = null;
         this.lastPlotClick = null;
@@ -71,9 +72,11 @@ LHI.PlotManager = class {
             ]
         };
 
-        this.cursorManager.onChange(() => {
-            this.updateCursorDisplay();
-        });
+        this.cursorManager.onChange(
+            () => {
+                this.updateCursorDisplay();
+            }
+        );
     }
 
     init() {
@@ -98,7 +101,9 @@ LHI.PlotManager = class {
     bindEvents() {
         this.element.on(
             "plotly_click",
-            event => this.handlePlotClick(event)
+            event => {
+                this.handlePlotClick(event);
+            }
         );
 
         this.element.on(
@@ -124,13 +129,33 @@ LHI.PlotManager = class {
             return;
         }
 
-        const pointIndex = event.points[0].pointIndex;
-        const now = Date.now();
+        const point =
+            event.points[0];
 
-        if (
+        const pointIndex =
+            point.pointIndex;
+
+        const curveNumber =
+            point.curveNumber;
+
+        const now =
+            Date.now();
+
+        const isSamePoint =
+            this.lastPlotClick
+            && this.lastPlotClick.pointIndex
+                === pointIndex
+            && this.lastPlotClick.curveNumber
+                === curveNumber;
+
+        const isWithinDelay =
             this.lastPlotClick
             && now - this.lastPlotClick.time
-                <= this.doubleClickDelay
+                <= this.doubleClickDelay;
+
+        if (
+            isSamePoint
+            && isWithinDelay
         ) {
             this.lastPlotClick = null;
 
@@ -143,7 +168,8 @@ LHI.PlotManager = class {
 
         this.lastPlotClick = {
             time: now,
-            pointIndex
+            pointIndex,
+            curveNumber
         };
     }
 
@@ -157,10 +183,12 @@ LHI.PlotManager = class {
     setInteractionMode(tool) {
         if (
             !Object
-                .values(LHI.ToolManager.TOOLS)
+                .values(
+                    LHI.ToolManager.TOOLS
+                )
                 .includes(tool)
         ) {
-            return;
+            return false;
         }
 
         this.currentTool = tool;
@@ -169,13 +197,20 @@ LHI.PlotManager = class {
         if (this.initialized) {
             this.applyInteractionMode();
         }
+
+        return true;
     }
 
     applyInteractionMode() {
+        if (!this.initialized) {
+            return;
+        }
+
         Plotly.relayout(
             this.element,
             {
-                dragmode: this.getDragMode()
+                dragmode:
+                    this.getDragMode()
             }
         );
     }
@@ -195,22 +230,35 @@ LHI.PlotManager = class {
     }
 
     setData(x, y) {
-        const xData = Array.isArray(x) ? x : [];
-        const yData = Array.isArray(y) ? y : [];
-        const length = Math.min(
-            xData.length,
-            yData.length
-        );
+        const xData =
+            Array.isArray(x)
+                ? x
+                : [];
 
-        this.xData = xData.slice(
-            0,
-            length
-        );
+        const yData =
+            Array.isArray(y)
+                ? y
+                : [];
 
-        this.yData = yData.slice(
-            0,
-            length
-        );
+        const length =
+            Math.min(
+                xData.length,
+                yData.length
+            );
+
+        this.xData =
+            xData.slice(
+                0,
+                length
+            );
+
+        this.yData =
+            yData.slice(
+                0,
+                length
+            );
+
+        this.lastPlotClick = null;
 
         this.cursorManager.setData(
             this.xData,
@@ -254,13 +302,19 @@ LHI.PlotManager = class {
         return {
             x,
             y,
+
             type: "scatter",
             mode: "lines",
 
             line: {
                 color: "#4FC3F7",
                 width: 1.5
-            }
+            },
+
+            hovertemplate:
+                "X : %{x}<br>"
+                + "Y : %{y}"
+                + "<extra></extra>"
         };
     }
 
@@ -294,13 +348,14 @@ LHI.PlotManager = class {
             return;
         }
 
-        const shapes = this.cursorManager
-            .getAll()
-            .map(cursor => {
-                return this.createCursorLine(
-                    cursor
-                );
-            });
+        const shapes =
+            this.cursorManager
+                .getAll()
+                .map(cursor => {
+                    return this.createCursorLine(
+                        cursor
+                    );
+                });
 
         Plotly.relayout(
             this.element,
