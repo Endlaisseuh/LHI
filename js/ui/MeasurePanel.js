@@ -269,6 +269,7 @@ LHI.MeasurePanel = class {
                 this.graphTitle;
 
         this.bindEvents();
+
         this.refreshExpandedState();
         this.setCursorMode(false);
         this.refresh();
@@ -328,7 +329,9 @@ LHI.MeasurePanel = class {
                     button.dataset.historyAction;
 
                 if (
-                    !Number.isInteger(measureId)
+                    !Number.isInteger(
+                        measureId
+                    )
                 ) {
                     return;
                 }
@@ -437,12 +440,16 @@ LHI.MeasurePanel = class {
 
         this.setText(
             "cursor-A-value",
-            this.formatCursor(cursorA)
+            this.formatCursor(
+                cursorA
+            )
         );
 
         this.setText(
             "cursor-B-value",
-            this.formatCursor(cursorB)
+            this.formatCursor(
+                cursorB
+            )
         );
 
         this.setText(
@@ -582,15 +589,25 @@ LHI.MeasurePanel = class {
                 this.graphTitle,
 
             cursorA: {
-                index: cursorA.index,
-                x: cursorA.x,
-                y: cursorA.y
+                index:
+                    cursorA.index,
+
+                x:
+                    cursorA.x,
+
+                y:
+                    cursorA.y
             },
 
             cursorB: {
-                index: cursorB.index,
-                x: cursorB.x,
-                y: cursorB.y
+                index:
+                    cursorB.index,
+
+                x:
+                    cursorB.x,
+
+                y:
+                    cursorB.y
             },
 
             statistics: {
@@ -638,15 +655,27 @@ LHI.MeasurePanel = class {
         this.refreshHistory();
     }
 
+    clearHistory() {
+        this.measureHistory = [];
+        this.nextMeasureId = 1;
+
+        if (this.element) {
+            this.refreshHistory();
+        }
+    }
+
     findMeasure(measureId) {
-        return this.measureHistory.find(
-            measure => {
-                return (
-                    measure.id
-                    === measureId
-                );
-            }
-        ) || null;
+        return (
+            this.measureHistory.find(
+                measure => {
+                    return (
+                        measure.id
+                        === measureId
+                    );
+                }
+            )
+            || null
+        );
     }
 
     restoreMeasure(measureId) {
@@ -741,7 +770,8 @@ LHI.MeasurePanel = class {
         container.innerHTML = "";
 
         history.hidden =
-            this.measureHistory.length === 0;
+            this.measureHistory.length
+            === 0;
 
         this.measureHistory.forEach(
             (measure, index) => {
@@ -779,8 +809,7 @@ LHI.MeasurePanel = class {
                         Mesure ${index + 1}
                     </div>
 
-                    <div class="measure-history-curve">
-                    </div>
+                    <div class="measure-history-curve"></div>
                 </div>
 
                 <div class="measure-history-actions">
@@ -811,8 +840,8 @@ LHI.MeasurePanel = class {
                     </span>
 
                     <span>
-                        X: ${this.formatNumber(measure.cursorA.x)}
-                        • Y: ${this.formatNumber(measure.cursorA.y)}
+                        X : ${this.formatNumber(measure.cursorA.x)}
+                        • Y : ${this.formatNumber(measure.cursorA.y)}
                     </span>
                 </div>
 
@@ -822,8 +851,8 @@ LHI.MeasurePanel = class {
                     </span>
 
                     <span>
-                        X: ${this.formatNumber(measure.cursorB.x)}
-                        • Y: ${this.formatNumber(measure.cursorB.y)}
+                        X : ${this.formatNumber(measure.cursorB.x)}
+                        • Y : ${this.formatNumber(measure.cursorB.y)}
                     </span>
                 </div>
             </div>
@@ -831,6 +860,7 @@ LHI.MeasurePanel = class {
             <div class="measure-history-statistics">
                 <div class="measure-history-stat">
                     <span>ΔX</span>
+
                     <strong>
                         ${this.formatNumber(measure.statistics.deltaX)}
                     </strong>
@@ -838,6 +868,7 @@ LHI.MeasurePanel = class {
 
                 <div class="measure-history-stat">
                     <span>Min</span>
+
                     <strong>
                         ${this.formatNumber(measure.statistics.minimum)}
                     </strong>
@@ -845,6 +876,7 @@ LHI.MeasurePanel = class {
 
                 <div class="measure-history-stat">
                     <span>Max</span>
+
                     <strong>
                         ${this.formatNumber(measure.statistics.maximum)}
                     </strong>
@@ -852,6 +884,7 @@ LHI.MeasurePanel = class {
 
                 <div class="measure-history-stat">
                     <span>Moyenne</span>
+
                     <strong>
                         ${this.formatNumber(measure.statistics.average)}
                     </strong>
@@ -922,8 +955,8 @@ LHI.MeasurePanel = class {
         }
 
         return (
-            `X: ${this.formatNumber(cursor.x)}`
-            + ` • Y: ${this.formatNumber(cursor.y)}`
+            `X : ${this.formatNumber(cursor.x)}`
+            + ` • Y : ${this.formatNumber(cursor.y)}`
         );
     }
 
